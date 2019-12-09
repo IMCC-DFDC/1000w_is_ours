@@ -30,7 +30,7 @@ parser.add_argument('--phase', default='train', type=str,
 args = parser.parse_args()
 
 def main():
-    save_path = '/home/shangzh/DFDC/model'
+    save_path = '/home/shangzh/DFDC/model/'
     str_time = time.strftime('%m-%d %H:%M:%S', time.localtime(time.time()))
     print(str_time)
     save_path = save_path + '{}_{}_{}_'.format(args.model, str_time, args.learnrate)
@@ -42,7 +42,7 @@ def main():
     transform_augment = T.Compose([
         T.Resize(args.crop_size),
         T.RandomHorizontalFlip(),
-        T.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4),
+        #T.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4),
         T.RandomCrop(256, padding=0)
     ])
     transform_test = T.Compose([
@@ -76,15 +76,18 @@ def main():
     model = model.cuda(args.gpu)
     ############################################ set up optimizer
     criterion = nn.CrossEntropyLoss().cuda(args.gpu)
-    optimizer = optim.SGD(filter(lambda p: p.requires_grad, model.fc.parameters()), lr=args.learnrate,
+    fc_id = id(model.fc.parameters())
+    optimizer = optim.SGD([{'params':filter(lambda p: id(p) == fc_id, model.parameters()),'lr':args.learnrate}],
                           momentum=0.9, weight_decay=args.weight_decay)
     ################################################## start training
     print('Training for %d epochs with learning rate %f' % (args.num_epochs, args.learnrate))
     best_acc = 0
     for epoch in range(args.num_epochs):
         if epoch >= 3:
-            optimizer = optim.SGD(filter(lambda p: p.requires_grad, model.parameters()), lr=args.learnrate,
-                                  momentum=0.9, weight_decay=args.weight_decay)
+            optimizer = optim.SGD([{'params':filter(lambda p: id(p) == fc_id, model.parameters()),'lr':args.learnrate},
+                                   {'params': filter(lambda p: id(p) != fc_id, model.parameters()),
+                                    'lr': 0.001}],
+                          momentum=0.9, weight_decay=args.weight_decay)
         ############################## train phase
         print('Starting epoch %d / %d' % (epoch + 1, args.num_epochs))
         if epoch == 0:
